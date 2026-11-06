@@ -19,6 +19,12 @@
   // anything about that app's data model.
   var contextUrl = currentScript.getAttribute("data-context-url");
   var fetchedContext = null;
+  // Optional: a pre-assigned access code for this trusted embedding site,
+  // so its users never see the chat's "enter access code" gate. Anyone
+  // viewing this page's source can see this value — only use it on sites
+  // where that's an acceptable trust boundary (e.g. behind the host's own
+  // login), not as a secret in itself.
+  var accessCode = currentScript.getAttribute("data-access-code") || null;
 
   var bubble = document.createElement("button");
   bubble.setAttribute("aria-label", title);
@@ -72,12 +78,18 @@
   document.body.appendChild(frame);
   document.body.appendChild(bubble);
 
-  // Relay fetched context into the iframe once both the fetch and the
-  // iframe's own load are done (order between the two is not guaranteed).
+  // Relay fetched context (and/or the pre-assigned access code) into the
+  // iframe once both the fetch and the iframe's own load are done (order
+  // between the two is not guaranteed). Skipped entirely if there's
+  // nothing to send and no access code configured, since contextUrl alone
+  // is optional.
+  var contextFetchDone = !contextUrl;
   function sendContextToFrame() {
-    if (fetchedContext === null || !frame.contentWindow) return;
+    if (!frame.contentWindow) return;
+    if (!contextFetchDone) return;
+    if (fetchedContext === null && accessCode === null) return;
     frame.contentWindow.postMessage(
-      { type: "chatbot-context", context: fetchedContext },
+      { type: "chatbot-context", context: fetchedContext, accessCode: accessCode },
       serviceOrigin
     );
   }
@@ -91,11 +103,16 @@
       })
       .then(function (text) {
         fetchedContext = text;
+        contextFetchDone = true;
         sendContextToFrame();
       })
       .catch(function () {
         // Context is optional — if the host's endpoint is unreachable or
         // errors, just fall back to a plain assistant with no grounding.
+        contextFetchDone = true;
+        sendContextToFrame();
       });
+  } else {
+    sendContextToFrame();
   }
 })();

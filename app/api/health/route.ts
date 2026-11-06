@@ -17,5 +17,9 @@ export async function GET() {
     clearTimeout(timeout);
   }
 
-  return Response.json({ model: config.llmModel, reachable });
+  return Response.json({
+    model: config.llmModel,
+    reachable,
+    requiresAccessCode: config.serviceApiKeys.length > 0,
+  });
 }

@@ -90,6 +90,78 @@
   flex-direction: column;
 }
 
+.gate {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.gate svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+.gateTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.gateSubtitle {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+.gateForm {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+.gateInput {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  outline: none;
+}
+.gateInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.gateButton {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.gateButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+.gateButton:disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+.gateError {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #dc2626;
+}
+
 .emptyState {
   flex: 1;
   display: flex;
