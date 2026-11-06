@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { track } from "@/lib/telemetry";
 
 // Lets the chat UI check an access code against SERVICE_API_KEYS before
 // unlocking the chat, giving immediate "invalid code" feedback without
@@ -29,5 +30,6 @@ export async function POST(req: Request) {
   }
 
   const valid = config.serviceApiKeys.includes(code.trim());
+  track("access_code_check", { valid });
   return Response.json({ valid }, { status: valid ? 200 : 401 });
 }

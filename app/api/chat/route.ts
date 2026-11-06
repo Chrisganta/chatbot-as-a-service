@@ -7,18 +7,21 @@ import {
   ValidationError,
 } from "@/lib/validateMessages";
 import { createSseToTextTransform } from "@/lib/sse";
+import { track } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
+  const startedAt = Date.now();
 
   // 1. Optional API key auth for external callers
   if (config.serviceApiKeys.length > 0) {
     const auth = req.headers.get("authorization");
     const key = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
     if (!key || !config.serviceApiKeys.includes(key)) {
+      track("chat_request", { outcome: "unauthorized", duration_ms: Date.now() - startedAt });
       return Response.json({ error: "Unauthorized" }, { status: 401, headers });
     }
   }
@@ -27,6 +30,7 @@ export async function POST(req: Request) {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (!checkRateLimit(ip)) {
+    track("chat_request", { outcome: "rate_limited", duration_ms: Date.now() - startedAt });
     return Response.json(
       { error: "Rate limit exceeded. Try again shortly." },
       { status: 429, headers }
@@ -43,6 +47,7 @@ export async function POST(req: Request) {
   } catch (err) {
     const message =
       err instanceof ValidationError ? err.message : "Invalid JSON body.";
+    track("chat_request", { outcome: "invalid_request", duration_ms: Date.now() - startedAt });
     return Response.json({ error: message }, { status: 400, headers });
   }
 
@@ -70,6 +75,7 @@ export async function POST(req: Request) {
       signal: req.signal,
     });
   } catch {
+    track("chat_request", { outcome: "llm_unreachable", duration_ms: Date.now() - startedAt });
     return Response.json(
       {
         error: `Could not reach the LLM endpoint at ${config.llmBaseUrl}. Is Ollama running?`,
@@ -80,11 +86,18 @@ export async function POST(req: Request) {
 
   if (!upstream.ok || !upstream.body) {
     const details = await upstream.text().catch(() => "");
+    track("chat_request", { outcome: "llm_error", duration_ms: Date.now() - startedAt });
     return Response.json(
       { error: "The LLM endpoint returned an error.", details },
       { status: 502, headers }
     );
   }
+
+  track("chat_request", {
+    outcome: "success",
+    duration_ms: Date.now() - startedAt,
+    hasContext: Boolean(context),
+  });
 
   // 5. Stream SSE response back as plain text
   const textStream = upstream.body.pipeThrough(createSseToTextTransform());
