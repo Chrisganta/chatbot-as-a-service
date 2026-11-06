@@ -2,19 +2,32 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
+import {
+  SendIcon,
+  StopIcon,
+  NewChatIcon,
+  EmptyChatIcon,
+  SunIcon,
+  MoonIcon,
+} from "./icons";
+import styles from "./ChatWindow.module.css";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
+const MAX_TEXTAREA_HEIGHT = 160;
+
 export function ChatWindow({ compact }: { compact?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [context, setContext] = useState<string | undefined>(undefined);
+  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // When embedded via widget.js inside an iframe, the host page may post
   // grounding context fetched from its own data-context-url endpoint. This
@@ -30,13 +43,20 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // Load conversation from localStorage on mount
+  // Load conversation + theme preference from localStorage on mount. Theme
+  // starts as null (follow OS prefers-color-scheme) to avoid a server/client
+  // render mismatch, then switches to an explicit value after this effect
+  // runs client-side only.
   useEffect(() => {
     const saved = localStorage.getItem("cas-conversation");
     if (saved) {
       try {
         setMessages(JSON.parse(saved));
       } catch {}
+    }
+    const savedTheme = localStorage.getItem("cas-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
     }
   }, []);
 
@@ -49,6 +69,14 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Auto-resize the textarea as the user types, capped at MAX_TEXTAREA_HEIGHT
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+  }, [input]);
 
   const send = async () => {
     if (!input.trim() || isStreaming) return;
@@ -149,68 +177,102 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
     setIsStreaming(false);
   };
 
+  const toggleTheme = () => {
+    // theme starts as null (follow OS); first toggle picks the opposite of
+    // whatever the OS preference currently renders as light by default.
+    const next = theme === "dark" ? "light" : theme === "light" ? "dark" : "dark";
+    setTheme(next);
+    localStorage.setItem("cas-theme", next);
+  };
+
+  const themeToggleLabel =
+    theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  const ThemeIcon = theme === "dark" ? SunIcon : MoonIcon;
+
   return (
     <div
-      className={`flex flex-col h-screen bg-white ${
-        compact ? "max-w-sm mx-auto" : ""
-      }`}
+      className={`${styles.chat} ${compact ? styles.compact : ""}`}
+      data-theme={theme ?? undefined}
     >
       {!compact && (
-        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Chat</h1>
-          <button
-            onClick={handleNewChat}
-            className="bg-white text-blue-600 px-3 py-1 rounded hover:bg-gray-100"
-          >
-            New chat
-          </button>
-        </div>
+        <header className={styles.header}>
+          <h1 className={styles.headerTitle}>Chat</h1>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={styles.iconButton}
+              aria-label={themeToggleLabel}
+              title={themeToggleLabel}
+            >
+              <ThemeIcon />
+            </button>
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className={styles.iconButton}
+              aria-label="Start new chat"
+              title="New chat"
+            >
+              <NewChatIcon />
+            </button>
+          </div>
+        </header>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4">
+      {compact && (
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className={styles.floatingThemeButton}
+          aria-label={themeToggleLabel}
+          title={themeToggleLabel}
+        >
+          <ThemeIcon />
+        </button>
+      )}
+
+      <div className={styles.messages}>
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            Start a conversation
+          <div className={styles.emptyState}>
+            <EmptyChatIcon />
+            <p>Ask me anything to get started</p>
           </div>
         )}
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} role={msg.role} content={msg.content} />
         ))}
         {isStreaming && (
-          <div className="text-gray-500 text-sm">
-            <span className="animate-pulse">●</span> Generating...
+          <div className={styles.typingIndicator} aria-live="polite">
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+            <span className={styles.srOnly}>Generating response…</span>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t p-4 bg-gray-50">
-        <div className="flex gap-2">
+      <div className={styles.inputArea}>
+        <div className={styles.inputRow}>
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message... (Shift+Enter for new line)"
-            className="flex-1 border rounded p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={3}
+            placeholder="Message..."
+            className={styles.textarea}
+            rows={1}
           />
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={send}
-              disabled={isStreaming || !input.trim()}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              Send
-            </button>
-            {isStreaming && (
-              <button
-                onClick={handleStop}
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-              >
-                Stop
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={isStreaming ? handleStop : send}
+            disabled={!isStreaming && !input.trim()}
+            className={`${styles.sendButton} ${isStreaming ? styles.stopButton : ""}`}
+            aria-label={isStreaming ? "Stop generating" : "Send message"}
+          >
+            {isStreaming ? <StopIcon /> : <SendIcon />}
+          </button>
         </div>
       </div>
     </div>

@@ -1,0 +1,25 @@
+.inlineCode {
+  background: var(--color-code-inline-bg);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.codeBlock {
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-size: 0.85em;
+}
+.codeBlock code {
+  background: none;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.link {
+  color: var(--color-link);
+  text-decoration: underline;
+}

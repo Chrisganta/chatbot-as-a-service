@@ -1,6 +1,7 @@
 "use client";
 
 import { Markdown } from "./Markdown";
+import styles from "./MessageBubble.module.css";
 
 export function MessageBubble({
   role,
@@ -11,20 +12,12 @@ export function MessageBubble({
 }) {
   const isUser = role === "user";
   return (
-    <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
-    >
-      <div
-        className={`max-w-xs px-4 py-2 rounded-lg ${
-          isUser
-            ? "bg-blue-500 text-white rounded-br-none"
-            : "bg-gray-200 text-gray-900 rounded-bl-none"
-        }`}
-      >
+    <div className={`${styles.row} ${isUser ? styles.rowUser : styles.rowAssistant}`}>
+      <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         {isUser ? (
-          <p>{content}</p>
+          <p className={styles.text}>{content}</p>
         ) : (
-          <div className="text-sm">
+          <div className={styles.markdownWrapper}>
             <Markdown>{content}</Markdown>
           </div>
         )}

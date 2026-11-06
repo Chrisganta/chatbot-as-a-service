@@ -33,3 +33,4 @@ coverage/
 tunnel-daemon.sh
 start-tunnel.sh
 TUNNEL-PLAYBOOK.md
+.vercel

@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import styles from "./Markdown.module.css";
 
 export function Markdown({ children }: { children: string }) {
   return (
@@ -10,16 +11,20 @@ export function Markdown({ children }: { children: string }) {
       components={{
         code({ inline, children, ...props }: any) {
           if (inline) {
-            return <code className="bg-gray-200 px-1 rounded" {...props}>{children}</code>;
+            return (
+              <code className={styles.inlineCode} {...props}>
+                {children}
+              </code>
+            );
           }
           return (
-            <pre className="bg-gray-800 text-white p-3 rounded overflow-x-auto my-2">
+            <pre className={styles.codeBlock}>
               <code {...props}>{children}</code>
             </pre>
           );
         },
         a: (props: any) => (
-          <a {...props} className="text-blue-600 underline" />
+          <a {...props} className={styles.link} target="_blank" rel="noopener noreferrer" />
         ),
       }}
     >
