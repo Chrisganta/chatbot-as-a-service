@@ -1,0 +1,27 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+
+  app:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      - LLM_BASE_URL=http://ollama:11434/v1
+      - LLM_MODEL=${LLM_MODEL:-qwen3:4b-instruct}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - SYSTEM_PROMPT=${SYSTEM_PROMPT:-You are a friendly, helpful assistant.}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - SERVICE_API_KEYS=${SERVICE_API_KEYS:-}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-20}
+    depends_on:
+      - ollama
+
+volumes:
+  ollama-data:
