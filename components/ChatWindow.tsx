@@ -65,10 +65,15 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
     localStorage.setItem("cas-conversation", JSON.stringify(messages));
   }, [messages]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages. Instant (not smooth) while streaming —
+  // smooth-scrolling on every single token re-triggers dozens of times a
+  // second, and the repeatedly-interrupted animation can leave the browser
+  // in a visibly broken intermediate layout state until streaming stops.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: isStreaming ? "auto" : "smooth",
+    });
+  }, [messages, isStreaming]);
 
   // Auto-resize the textarea as the user types, capped at MAX_TEXTAREA_HEIGHT
   useEffect(() => {
