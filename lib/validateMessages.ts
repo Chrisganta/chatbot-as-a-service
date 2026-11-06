@@ -4,9 +4,8 @@ export interface ChatMessage {
   content: string;
 }
 
-const MAX_MESSAGE_LENGTH = 4000;
-const MAX_HISTORY = 20;
-const MAX_CONTEXT_LENGTH = 8000;
+const MAX_HISTORY = 60;
+const MAX_CONTEXT_LENGTH = 24000;
 
 export class ValidationError extends Error {}
 
@@ -37,11 +36,6 @@ export function validateAndTrim(body: unknown): ChatMessage[] {
     }
     const content = (m as any).content.trim();
     if (content.length === 0) continue;
-    if (content.length > MAX_MESSAGE_LENGTH) {
-      throw new ValidationError(
-        `Message content exceeds ${MAX_MESSAGE_LENGTH} characters.`
-      );
-    }
     cleaned.push({ role: (m as any).role, content });
   }
 
