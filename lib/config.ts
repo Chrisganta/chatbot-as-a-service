@@ -21,6 +21,18 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   rateLimitPerMinute: Number(envOr("RATE_LIMIT_PER_MINUTE", "20")),
+  // Server-to-server secrets for embedding hosts to call /api/issue-session.
+  // Never sent to a browser — distinct from serviceApiKeys, which are the
+  // (browser-visible) static codes used by the standalone site's gate.
+  embedServerKeys: (process.env.EMBED_SERVER_KEYS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  // HMAC key used to sign/verify short-lived session tokens. Required for
+  // /api/issue-session to work; left unset, it refuses to issue tokens
+  // rather than silently signing with an empty key.
+  sessionSigningSecret: process.env.SESSION_SIGNING_SECRET || "",
+  sessionTtlMinutes: Number(envOr("SESSION_TTL_MINUTES", "60")),
 } as const;
 
 // Builds the auth header(s) to send to LLM_BASE_URL. Bearer token (for

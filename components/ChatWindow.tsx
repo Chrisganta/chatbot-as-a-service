@@ -34,6 +34,10 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
   // data-access-code attribute).
   const [requiresAccessCode, setRequiresAccessCode] = useState<boolean | null>(null);
   const [accessCode, setAccessCode] = useState<string | null>(null);
+  // Short-lived token from a host's data-session-url (see widget.js). Takes
+  // priority over accessCode when both are present, and is never persisted
+  // to localStorage — it's meant to expire and get refreshed by the host.
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [gateError, setGateError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -53,6 +57,7 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
       if (e.data?.type === "chatbot-context") {
         setContext(e.data.context ?? undefined);
         if (e.data.accessCode) setAccessCode(e.data.accessCode);
+        setSessionToken(e.data.sessionToken ?? null);
       }
     }
     window.addEventListener("message", handleMessage);
@@ -151,11 +156,12 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
     abortControllerRef.current = controller;
 
     try {
+      const bearer = sessionToken || accessCode;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(accessCode ? { Authorization: `Bearer ${accessCode}` } : {}),
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           messages: [...messages, userMessage],
@@ -166,10 +172,20 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
 
       if (!res.ok) {
         if (res.status === 401) {
-          // The code was revoked or never valid — clear it and show the
-          // gate again instead of leaving the user stuck on silent errors.
-          setAccessCode(null);
-          localStorage.removeItem("cas-access-code");
+          if (sessionToken) {
+            // Expired, not revoked — ask the host (widget.js) for a fresh
+            // one instead of showing the static-code gate, which an embed
+            // user has no code to fill in.
+            setSessionToken(null);
+            if (window.parent !== window) {
+              window.parent.postMessage({ type: "chatbot-session-expired" }, "*");
+            }
+          } else {
+            // The code was revoked or never valid — clear it and show the
+            // gate again instead of leaving the user stuck on silent errors.
+            setAccessCode(null);
+            localStorage.removeItem("cas-access-code");
+          }
           setMessages((prev) => prev.slice(0, -1));
           setIsStreaming(false);
           return;
@@ -271,8 +287,8 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
 
   // Don't flash the open chat UI while we don't yet know if a code is
   // required (and don't already have one saved that would make it moot).
-  const checkingGate = requiresAccessCode === null && !accessCode;
-  const gateOpen = requiresAccessCode === true && !accessCode;
+  const checkingGate = requiresAccessCode === null && !accessCode && !sessionToken;
+  const gateOpen = requiresAccessCode === true && !accessCode && !sessionToken;
 
   return (
     <div

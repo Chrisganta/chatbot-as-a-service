@@ -8,6 +8,7 @@ import {
 } from "@/lib/validateMessages";
 import { createSseToTextTransform } from "@/lib/sse";
 import { track } from "@/lib/telemetry";
+import { verifySessionToken } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -16,11 +17,14 @@ export async function POST(req: Request) {
   const headers = corsHeaders(origin);
   const startedAt = Date.now();
 
-  // 1. Optional API key auth for external callers
+  // 1. Auth: either a static SERVICE_API_KEYS code (standalone site / direct
+  // API callers) or a short-lived session token minted via /api/issue-session
+  // (embeds — see lib/session.ts).
   if (config.serviceApiKeys.length > 0) {
     const auth = req.headers.get("authorization");
     const key = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (!key || !config.serviceApiKeys.includes(key)) {
+    const authorized = !!key && (config.serviceApiKeys.includes(key) || verifySessionToken(key));
+    if (!authorized) {
       track("chat_request", { outcome: "unauthorized", duration_ms: Date.now() - startedAt });
       return Response.json({ error: "Unauthorized" }, { status: 401, headers });
     }

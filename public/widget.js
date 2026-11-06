@@ -25,6 +25,15 @@
   // where that's an acceptable trust boundary (e.g. behind the host's own
   // login), not as a secret in itself.
   var accessCode = currentScript.getAttribute("data-access-code") || null;
+  // Optional (preferred over data-access-code): a same-origin URL on the
+  // HOST's own backend that returns a short-lived session token, e.g.
+  // { "token": "..." }. The host's backend fetches that token server-to-
+  // server from /api/issue-session using an EMBED_SERVER_KEYS secret that
+  // never reaches the browser, then hands it to this endpoint. Unlike
+  // data-access-code, the value this widget sees expires — a leaked token
+  // is only useful briefly, not forever.
+  var sessionUrl = currentScript.getAttribute("data-session-url");
+  var sessionToken = null;
 
   var bubble = document.createElement("button");
   bubble.setAttribute("aria-label", title);
@@ -78,18 +87,23 @@
   document.body.appendChild(frame);
   document.body.appendChild(bubble);
 
-  // Relay fetched context (and/or the pre-assigned access code) into the
-  // iframe once both the fetch and the iframe's own load are done (order
-  // between the two is not guaranteed). Skipped entirely if there's
-  // nothing to send and no access code configured, since contextUrl alone
-  // is optional.
+  // Relay fetched context, the pre-assigned access code, and/or a fetched
+  // session token into the iframe once the context fetch, the session
+  // fetch, and the iframe's own load are all done (order between them is
+  // not guaranteed). Skipped entirely if there's nothing to send.
   var contextFetchDone = !contextUrl;
+  var sessionFetchDone = !sessionUrl;
   function sendContextToFrame() {
     if (!frame.contentWindow) return;
-    if (!contextFetchDone) return;
-    if (fetchedContext === null && accessCode === null) return;
+    if (!contextFetchDone || !sessionFetchDone) return;
+    if (fetchedContext === null && accessCode === null && sessionToken === null) return;
     frame.contentWindow.postMessage(
-      { type: "chatbot-context", context: fetchedContext, accessCode: accessCode },
+      {
+        type: "chatbot-context",
+        context: fetchedContext,
+        accessCode: accessCode,
+        sessionToken: sessionToken,
+      },
       serviceOrigin
     );
   }
@@ -112,7 +126,42 @@
         contextFetchDone = true;
         sendContextToFrame();
       });
-  } else {
+  }
+
+  function fetchSessionToken() {
+    return fetch(sessionUrl, { credentials: "include" })
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        return data && data.token ? data.token : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  if (sessionUrl) {
+    fetchSessionToken().then(function (token) {
+      sessionToken = token;
+      sessionFetchDone = true;
+      sendContextToFrame();
+    });
+  }
+
+  if (!contextUrl && !sessionUrl) {
     sendContextToFrame();
   }
+
+  // The iframe tells us (via postMessage) when its session token has
+  // expired mid-conversation, so we can fetch a fresh one without the user
+  // having to reload the host page.
+  window.addEventListener("message", function (e) {
+    if (e.source !== frame.contentWindow || e.data?.type !== "chatbot-session-expired") return;
+    if (!sessionUrl) return;
+    fetchSessionToken().then(function (token) {
+      sessionToken = token;
+      sendContextToFrame();
+    });
+  });
 })();
