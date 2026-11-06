@@ -1,7 +1,10 @@
 .chat {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
   background: var(--color-bg);
   color: var(--color-text);
   position: relative;
@@ -80,6 +83,7 @@
 
 .messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;

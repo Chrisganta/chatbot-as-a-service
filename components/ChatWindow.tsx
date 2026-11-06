@@ -26,7 +26,7 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
   const [context, setContext] = useState<string | undefined>(undefined);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // When embedded via widget.js inside an iframe, the host page may post
@@ -65,12 +65,16 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
     localStorage.setItem("cas-conversation", JSON.stringify(messages));
   }, [messages]);
 
-  // Scroll to bottom on new messages. Instant (not smooth) while streaming —
-  // smooth-scrolling on every single token re-triggers dozens of times a
-  // second, and the repeatedly-interrupted animation can leave the browser
-  // in a visibly broken intermediate layout state until streaming stops.
+  // Scroll the message list itself — never scrollIntoView, which walks
+  // ancestor overflow (including the card's overflow: hidden) and parks
+  // the composer in the middle of the frame with empty space below it.
+  // Instant (not smooth) while streaming so per-token updates don't
+  // interrupt an in-flight animation.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTo({
+      top: el.scrollHeight,
       behavior: isStreaming ? "auto" : "smooth",
     });
   }, [messages, isStreaming]);
@@ -237,7 +241,7 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
         </button>
       )}
 
-      <div className={styles.messages}>
+      <div className={styles.messages} ref={messagesContainerRef}>
         {messages.length === 0 && (
           <div className={styles.emptyState}>
             <EmptyChatIcon />
@@ -255,7 +259,6 @@ export function ChatWindow({ compact }: { compact?: boolean }) {
             <span className={styles.srOnly}>Generating response…</span>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <div className={styles.inputArea}>
